@@ -31,9 +31,6 @@ public class ClientHandler {
         return name;
     }
 
-    public static List<String> getAvailableContacts() {
-        return availableContacts;
-    }
 
     public ClientHandler(MyServer myServer, Socket socket, AuthService authService) {
         try {
