@@ -1,5 +1,6 @@
 package chat;
 
+import ClientServer.Command;
 import chat.auto.AuthService;
 import chat.auto.BaseAuthService;
 import chat.handler.ClientHandler;
@@ -12,78 +13,94 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
-
 public class MyServer {
-    private final int PORT = 8189;
 
-    private List<ClientHandler> clients;
-    private AuthService authService;
+    private final ServerSocket serverSocket;
+    private final AuthService authService;
+    private final List<ClientHandler> clients = new ArrayList<>();
 
-    public AuthService getAuthService() {
-        return authService;
+    public MyServer(int port) throws IOException {
+        this.serverSocket = new ServerSocket(port);
+        this.authService = new BaseAuthService();
     }
 
-    public List<String> getClients() {
-        List<String> contacts = new ArrayList<>();
-        for (ClientHandler client : clients) {
-            contacts.add(client.getName());
+public void start() throws IOException {
+        System.out.println("Сервер запущен!");
+
+        try {
+        while (true) {
+        waitAndProcessNewClientConnection();
         }
-        return contacts;
-    }
-
-    public MyServer() {
-        try (ServerSocket server = new ServerSocket(PORT)) {
-            authService = new BaseAuthService();
-            authService.start();
-            clients = new ArrayList<>();
-            while (true) {
-                System.out.println("Сервер ожидает подключения");
-                Socket socket = server.accept();
-                System.out.println("Клиент подключился");
-                new ClientHandler(this, socket, authService);
-                System.out.println(authService.contacts());
-
-            }
         } catch (IOException e) {
-            System.out.println("Ошибка в работе сервера");
+        System.out.println("Ошибка создания нового подключения");
+        e.printStackTrace();
         } finally {
-            if (authService != null) {
-                authService.stop();
-            }
+        serverSocket.close();
         }
-    }
+        }
 
-    public synchronized boolean isNickBusy(String nick) {
-        for (ClientHandler o : clients) {
-            if (o.getName().equals(nick)) {
-                return true;
-            }
+private void waitAndProcessNewClientConnection() throws IOException {
+        System.out.println("Ожидание пользователя...");
+        Socket clientSocket = serverSocket.accept();
+        System.out.println("Клиент подключился!");
+        processClientConnection(clientSocket);
+        }
+
+private void processClientConnection(Socket clientSocket) throws IOException {
+        ClientHandler clientHandler = new ClientHandler(this, clientSocket);
+        clientHandler.handle();
+        }
+
+public AuthService getAuthService() {
+        return authService;
+        }
+
+public synchronized boolean isUsernameBusy(String clientUsername) {
+        for (ClientHandler client : clients) {
+        if (client.getClientUsername().equals(clientUsername)) {
+        return true;
+        }
         }
         return false;
-    }
+        }
 
-    public synchronized void broadcastMsg( String msg) {
-       //if (msg.startsWith("/w")) {
-            // String client = msg.split("//s+", 2)[1];
-          //  for (ClientHandler o : clients) {
-          //      if (o.equals(client)) o.sendMsg(msg.split("//s+", 2)[2]);
-           // }
-      //  } else {
-            for (ClientHandler o : clients) {
-                o.sendMsg(msg);
-            }
-       // }
-    }
+public synchronized void subscribe(ClientHandler clientHandler) throws IOException {
+        clients.add(clientHandler);
+        List<String> usernames = getAllUsernames();
+        broadcastMessage(null, Command.updateUsersListCommand(usernames));
+        }
 
+private List<String> getAllUsernames() {
+        List<String> usernames = new ArrayList<>();
+        for (ClientHandler client : clients) {
+        usernames.add(client.getClientUsername());
+        }
+        return usernames;
+        }
 
+public synchronized void unSubscribe(ClientHandler clientHandler) throws IOException {
+        clients.remove(clientHandler);
+        List<String> usernames = getAllUsernames();
+        broadcastMessage(null, Command.updateUsersListCommand(usernames));
+        }
 
-    public synchronized void unsubscribe(ClientHandler o) {
-        clients.remove(o);
+public synchronized void broadcastMessage(ClientHandler sender, Command command) throws IOException {
+        for (ClientHandler client : clients) {
+        if (client == sender) {
+        continue;
+        }
+        client.sendMessage(command);
 
-    }
+        }
+        }
 
-    public synchronized void subscribe(ClientHandler o) {
-        clients.add(o);
+public synchronized void sendPrivateMessage(String recipient, Command command) throws IOException {
+        for (ClientHandler client : clients) {
+        if (client.getClientUsername().equals(recipient)) {
+        client.sendMessage(command);
+        break;
+        }
+        }
+        }
 
-    }
 }

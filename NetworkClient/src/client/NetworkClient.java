@@ -1,97 +1,101 @@
 package client;
-
-import client.controllers.AuthDialog;
-import client.controllers.Controller;
-import client.models.Network;
+import client.controllers.AuthDialogController;
+import client.controllers.ChatController;
 import javafx.application.Application;
-import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import client.models.Network;
+
+import java.io.IOException;
+import java.util.List;
 
 
 public class NetworkClient extends Application {
-   public Stage primaryStage;
+
+    public static final List<String> USERS_TEST_DATA = List.of("Борис_Николаевич", "Гендальф_Серый", "Мартин_Некотов");
+    public Stage primaryStage;
     private Stage authStage;
     private Network network;
-    private Controller controller;
-
-    @Override
-    public void start(Stage primaryStage) throws Exception {
-       this.primaryStage=primaryStage;
-        FXMLLoader authloader = new FXMLLoader(getClass().getResource("views/AuthDialog.fxml"));
-        authStage = new Stage();
-        Parent page = authloader.load();
-        authStage.setTitle("Авторизация");
-        authStage.initModality(Modality.WINDOW_MODAL);
-        authStage.initOwner(primaryStage);
-        Scene scene=new Scene(page);
-        authStage.setScene(scene);
-       //  authStage.show();
-        FXMLLoader loader =new FXMLLoader(getClass().getResource("views/sample1.fxml"));
-        Parent root = loader.load();
-        primaryStage.setTitle("Messenger");
-        primaryStage.setScene(new Scene(root, 421, 400));
-        primaryStage.show();
-        authStage.show();
-        network = new Network();
-        if (!network.Connect()) {
-            showErrorMessage("","Ошибка подключения к серверу.");
-        }
-        controller = loader.getController();
-        controller.setNetwork(network);
-        AuthDialog authDialog=authloader.getController();
-        authDialog.setNetwork(network);
-        authDialog.setNetworkClient(this);
-//       Thread thread= new Thread(()->
-//       {
-//           String serverMessage = null;
-//           try {
-//               serverMessage = network.getDataInputStream().readUTF();
-//               controller.appendMessage(serverMessage);
-//           } catch (IOException e) {
-//               e.printStackTrace();
-//           }
-//
-//       });
-      //Thread thread= new Thread(() -> network.waitMessage(controller));
-       // network.waitMessage(controller);
-       //thread.setDaemon(true);
-        //thread.start();
-        primaryStage.setOnCloseRequest((windowEvent -> {
-            network.setDataOutputStream("exit");
-            network.Close();
-      //      thread.interrupt();
-            Platform.exit();
-        }));
-    }
-
-   public static void showErrorMessage (String message, String errorMessage){
-    Alert alert= new Alert(Alert.AlertType.ERROR);
-    alert.setTitle("Ошибка.");
-    alert.setHeaderText(errorMessage);
-    alert.setContentText(message);
-    alert.setHeight(300);
-    alert.showAndWait();
-
-}
-
-    public Network getNetwork() {
-        return network;
-    }
+    private ChatController chatController;
 
     public static void main(String[] args) {
         launch(args);
+    }
 
+
+    @Override
+    public void start(Stage primaryStage) throws Exception {
+
+        this.primaryStage = primaryStage;
+        network = new Network();
+        if (!network.connect()) {
+            showErrorMessage("", "Ошибка подключения к серверу");
+            return;
+        }
+
+        openAuthDialog(primaryStage);
+        createChatDialog(primaryStage);
     }
-    public void openChat (){
+
+    private void createChatDialog(Stage primaryStage) throws IOException {
+        FXMLLoader mainLoader = new FXMLLoader();
+        mainLoader.setLocation(NetworkClient.class.getResource("views/chat-view.fxml"));
+
+        Parent root = mainLoader.load();
+
+        primaryStage.setTitle("Messenger");
+        primaryStage.setScene(new Scene(root, 600, 400));
+
+        chatController = mainLoader.getController();
+        chatController.setNetwork(network);
+
+
+        primaryStage.setOnCloseRequest(event -> network.close());
+    }
+
+    private void openAuthDialog(Stage primaryStage) throws IOException {
+
+        FXMLLoader authLoader = new FXMLLoader();
+        authLoader.setLocation(NetworkClient.class.getResource("views/auth-dialog.fxml"));
+        Parent page = authLoader.load();
+        authStage = new Stage();
+
+        authStage.setTitle("Авторизация");
+        authStage.initModality(Modality.WINDOW_MODAL);
+        authStage.initOwner(primaryStage);
+        Scene scene = new Scene(page);
+        authStage.setScene(scene);
+        authStage.show();
+        AuthDialogController authDialogController = authLoader.getController();
+        authDialogController.setNetwork(network);
+        authDialogController.setNetworkClient(this);
+    }
+
+    public static void showErrorMessage(String message, String errorMessage) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle("Проблемы с соединением");
+        alert.setHeaderText(errorMessage);
+        alert.setContentText(message);
+        alert.showAndWait();
+    }
+
+
+    public Stage getPrimaryStage() {
+        return primaryStage;
+    }
+
+    public void openChat() {
         authStage.close();
-        primaryStage.setTitle(network.getUsername());
         primaryStage.show();
-        controller.addContacts();
-        network.waitMessage(controller);
+        primaryStage.setTitle(network.getUsername());
+        System.out.println(network.getUsername());
+        chatController.setUsernameTitle(network.getUsername());
+        network.waitMessage(chatController);
     }
+
+
 }

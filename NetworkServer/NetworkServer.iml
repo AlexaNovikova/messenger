@@ -7,5 +7,33 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="module" module-name="NetworkClientServer" />
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$PATH_TO_FX$/src.zip!/" />
+          <root url="jar://$PATH_TO_FX$/javafx-swt.jar!/" />
+          <root url="jar://$PATH_TO_FX$/javafx.web.jar!/" />
+          <root url="jar://$PATH_TO_FX$/javafx.base.jar!/" />
+          <root url="jar://$PATH_TO_FX$/javafx.fxml.jar!/" />
+          <root url="jar://$PATH_TO_FX$/javafx.media.jar!/" />
+          <root url="jar://$PATH_TO_FX$/javafx.swing.jar!/" />
+          <root url="jar://$PATH_TO_FX$/javafx.controls.jar!/" />
+          <root url="jar://$PATH_TO_FX$/javafx.graphics.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES>
+          <root url="jar://$PATH_TO_FX$/src.zip!/" />
+          <root url="jar://$PATH_TO_FX$/javafx-swt.jar!/" />
+          <root url="jar://$PATH_TO_FX$/javafx.web.jar!/" />
+          <root url="jar://$PATH_TO_FX$/javafx.base.jar!/" />
+          <root url="jar://$PATH_TO_FX$/javafx.fxml.jar!/" />
+          <root url="jar://$PATH_TO_FX$/javafx.media.jar!/" />
+          <root url="jar://$PATH_TO_FX$/javafx.swing.jar!/" />
+          <root url="jar://$PATH_TO_FX$/javafx.controls.jar!/" />
+          <root url="jar://$PATH_TO_FX$/javafx.graphics.jar!/" />
+        </SOURCES>
+      </library>
+    </orderEntry>
   </component>
 </module>

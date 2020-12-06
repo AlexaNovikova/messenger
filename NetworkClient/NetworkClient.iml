@@ -21,5 +21,6 @@
       </library>
     </orderEntry>
     <orderEntry type="library" exported="" name="lib" level="project" />
+    <orderEntry type="module" module-name="NetworkClientServer" />
   </component>
 </module>

@@ -1,164 +1,184 @@
 package client.models;
+import ClientServer.Command;
+import ClientServer.commands.*;
+import client.controllers.ChatController;
 
-import client.controllers.Controller;
-import com.sun.glass.events.WheelEvent;
+import javafx.application.Platform;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.Socket;
-import java.net.SocketException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 public class Network {
-
-    public static final String AUTH_CMD_PREFIX ="/auth";
-    public static final String AUTHOK_CMD_PREFIX ="/authok";
-    public static final String AUTHERR_CMD_PREFIX ="/autherr";
-
 
     private static final String SERVER_ADRESS = "localhost";
     private static final int SERVER_PORT = 8189;
 
-    private final int port;
     private final String host;
-    private DataOutputStream dataOutputStream;
-    private DataInputStream dataInputStream;
+    private final int port;
+
+    private ObjectOutputStream dataOutputStream;
+    private ObjectInputStream dataInputStream;
+
     private Socket socket;
-    private  String username;
 
-    public Network() {
-        this(SERVER_PORT, SERVER_ADRESS);
-    }
+    private String username;
 
-    public Network(int port, String host) {
-        this.port = port;
-        this.host = host;
-    }
-
-    public DataInputStream getDataInputStream() {
-        return dataInputStream;
-    }
-
-    public DataOutputStream getDataOutputStream() {
+    public ObjectOutputStream getDataOutputStream() {
         return dataOutputStream;
     }
 
-    public void setDataOutputStream(String str) {
-        try {
-            this.dataOutputStream.writeUTF(str);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+    public ObjectInputStream getDataInputStream() {
+        return dataInputStream;
     }
 
-    public boolean Connect() {
+    public Network() {
+        this(SERVER_ADRESS, SERVER_PORT);
+    }
+
+    public Network(String host, int port) {
+        this.host = host;
+        this.port = port;
+    }
+
+    public boolean connect() {
         try {
-            socket = new Socket(SERVER_ADRESS, SERVER_PORT);
-            dataInputStream = new DataInputStream(socket.getInputStream());
-            dataOutputStream = new DataOutputStream(socket.getOutputStream());
+            socket = new Socket(host, port);
+            dataOutputStream = new ObjectOutputStream(socket.getOutputStream());
+            dataInputStream = new ObjectInputStream(socket.getInputStream());
             return true;
+
         } catch (IOException e) {
-            System.out.println("Ошибка установки соединения!");
+            System.out.println("Соединение не было установлено!");
             e.printStackTrace();
             return false;
         }
+
     }
 
-
-    public void Close() {
+    public void close() {
         try {
-            dataInputStream.close();
-            dataOutputStream.close();
             socket.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public void waitMessage(Controller controller) {
-        {
-            Thread thread = new Thread(() -> {
-                while (!socket.isClosed()) {
-                    try {
-                        String message = dataInputStream.readUTF();
-                        if (!message.split("\\s+", 2)[1].equals("NICK_INFO")) {
-                            try {
+    public void waitMessage(ChatController chatController) {
 
-                                if (message.split("\\s+", 4)[1].equals("/w")) {
-                                    String recipient = message.split("\\s+", 4)[2];
-                                    if (recipient.equals(this.username) || message.split("\\s+", 4)[0].equals(this.username + ":"))
-                                        controller.appendMessage(message.split("\\s+", 4)[0] + message.split("\\s+", 4)[3]);
-                                }
-//                         getNicksFromServer();
-//                          controller.addContacts();
-                                if (!message.split("\\s+", 4)[1].equals("/w")) controller.appendMessage(message);
+        Thread thread = new Thread( () -> {
+            try { while (true) {
 
-                            } catch (ArrayIndexOutOfBoundsException e) {
-                                controller.appendMessage(message);
-                            }
-                        }
-
-
-                    } catch (SocketException e) {
-
-                        // user closed connection
-                        return;
-                    } catch (IOException e) {
-                        System.out.println("Соединение потеряно!");
-                        e.printStackTrace();
-
-                    }
+                Command command = readCommand();
+                if(command == null) {
+                    chatController.showError("Ошибка серверва", "Получена неверная команда");
+                    continue;
                 }
-            }
 
-            );
-            thread.setDaemon(true);
-            thread.start();
-        }
+                switch (command.getType()) {
+                    case INFO_MESSAGE: {
+                        MessageInfoCommandData data = (MessageInfoCommandData) command.getData();
+                        String message = data.getMessage();
+                        String sender = data.getSender();
+                        String formattedMessage = sender != null ? String.format("%s: %s", sender, message) : message;
+                        Platform.runLater(() -> {
+                            chatController.appendMessage(formattedMessage);
+                        });
+                        break;
+                    }
+                    case ERROR: {
+                        ErrorCommandData data = (ErrorCommandData) command.getData();
+                        String errorMessage = data.getErrorMessage();
+                        Platform.runLater(() -> {
+                            chatController.showError("Server error", errorMessage);
+                        });
+                        break;
+                    }
+                    case UPDATE_USERS_LIST: {
+                        UpdateUsersListCommandData data = (UpdateUsersListCommandData) command.getData();
+                        Platform.runLater(() -> chatController.updateUsers(data.getUsers()));
+                        break;
+                    }
+                    default:
+                        Platform.runLater(() -> {
+                            chatController.showError("Unknown command from server!", command.getType().toString());
+                        });
+                }
+
+            }
+            } catch (IOException e) {
+                e.printStackTrace();
+                System.out.println("Соединение потеряно!");
+            }
+        });
+        thread.setDaemon(true);
+        thread.start();
     }
+
 
     public String sendAuthCommand(String login, String password) {
         try {
-            dataOutputStream.writeUTF(String.format("%s %s %s", AUTH_CMD_PREFIX, login, password));
-            String response = dataInputStream.readUTF();
-            if (response.startsWith(AUTHOK_CMD_PREFIX)){
-                this.username= response.split("\\s+", 2)[1];
-                return null;
+            Command authCommand = Command.authCommand(login, password);
+            dataOutputStream.writeObject(authCommand);
+
+            Command command = readCommand();
+            if (command == null) {
+                return "Ошибка чтения команды с сервера";
             }
-            else return response;
+
+            switch (command.getType()) {
+                case AUTH_OK: {
+                    AuthOkCommandData data = (AuthOkCommandData) command.getData();
+                    this.username = data.getUsername();
+                    return null;
+                }
+
+                case AUTH_ERROR:
+                case ERROR: {
+                    AuthErrorCommandData data = (AuthErrorCommandData) command.getData();
+                    return data.getErrorMessage();
+                }
+                default:
+                    return "Unknown type of command: " + command.getType();
+
+            }
         } catch (IOException e) {
             e.printStackTrace();
             return e.getMessage();
         }
     }
 
-    public List<String > getNicksFromServer (){
-        try {
-            dataOutputStream.writeUTF("NICK_INFO");
-            String responce = dataInputStream.readUTF();
-            List <String> contactsFromServer = new ArrayList<>();
-                if (responce.startsWith("NICK_INFO")) {
-                    String [] nickFromServer = responce.split("\\s+",7);
-                     contactsFromServer.addAll(Arrays.asList(nickFromServer));
-                    contactsFromServer.remove(0);
-                    return contactsFromServer;
-                }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-     return null;
-    }
-
     public String getUsername() {
         return username;
     }
 
-}
+    public void sendMessage(String message) throws IOException {
+        sendMessage(Command.publicMessageCommand(username, message));
+    }
 
+    public void sendMessage(Command command) throws IOException {
+        dataOutputStream.writeObject(command);
+    }
+
+
+
+    public void sendPrivateMessage(String message, String recipient) throws IOException {
+//        String command = String.format("%s %s %s",PRIVATE_MSG_CMD_PREFIX, recipient, message);
+        Command command = Command.privateMessageCommand(recipient, message);
+        sendMessage(command);
+    }
+
+    private Command readCommand() throws IOException {
+        try {
+            return (Command) dataInputStream.readObject();
+        } catch (ClassNotFoundException e) {
+            String errorMessage = "Получен неизвестный объект";
+            System.err.println(errorMessage);
+            e.printStackTrace();
+            sendMessage(Command.errorCommand(errorMessage));
+            return null;
+        }
+    }
+}
 
 
 
