@@ -1,4 +1,5 @@
 package client.controllers;
+import ClientServer.Command;
 import client.NetworkClient;
 import client.models.Network;
 import javafx.event.ActionEvent;
@@ -30,6 +31,11 @@ public class AuthDialogController {
             if (authErrorMessage == null) {
                 networkClient.openChat();
             } else {
+                if (authErrorMessage.equals("Время ожидания истекло!")){
+                    NetworkClient.showErrorMessage(authErrorMessage, "Ошибка подключения!");
+                    network.close();
+                    System.exit(1);
+                }
                 NetworkClient.showErrorMessage(authErrorMessage, "Ошибка авторизации");
 
             }

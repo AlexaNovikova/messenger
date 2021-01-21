@@ -73,6 +73,7 @@ public class NetworkClient extends Application {
         AuthDialogController authDialogController = authLoader.getController();
         authDialogController.setNetwork(network);
         authDialogController.setNetworkClient(this);
+
     }
 
     public static void showErrorMessage(String message, String errorMessage) {

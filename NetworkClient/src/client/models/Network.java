@@ -132,16 +132,22 @@ public class Network {
                     return null;
                 }
 
-                case AUTH_ERROR:
-                case ERROR: {
+                case AUTH_ERROR: {
                     AuthErrorCommandData data = (AuthErrorCommandData) command.getData();
                     return data.getErrorMessage();
                 }
-                default:
+                case ERROR: {
+                    ErrorCommandData data = (ErrorCommandData) command.getData();
+                    System.exit(1);
+                }
+                default: {
                     return "Unknown type of command: " + command.getType();
+                }
+
 
             }
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             e.printStackTrace();
             return e.getMessage();
         }
